@@ -1,0 +1,50 @@
+#version 450
+
+layout (local_size_x = 16, local_size_y = 16) in;
+layout (binding = 0, rgba8) uniform writeonly image2D resultImage;
+
+struct Camera 
+{
+	vec3 pos;   
+	vec3 lookat;
+	float fov; 
+};
+
+ layout (binding = 1) uniform UBO 
+ {
+ 	vec3 lightPos;
+ 	float aspectRatio;
+ 	vec4 fogColor;
+ 	Camera camera;
+ 	mat4 rotMat;
+ } ubo;
+
+float randd(vec2 co)
+{
+  return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+void main()
+{
+  ivec2 pixCoord = ivec2(gl_GlobalInvocationID.xy);
+  ivec2 dim = imageSize(resultImage);
+
+    // Ensure we are operating within the bounds of the image
+  if (pixCoord.x >= dim.x || pixCoord.y >= dim.y)
+  {
+    return; // Skip any work for threads outside the image bounds
+  }
+
+    // Normalized UV coordinates: ranging from 0.0 to 1.0 across the image dimensions
+  vec2 uv = vec2(pixCoord) / vec2(dim);
+
+    // Creating a gradient effect based on the UV coordinates
+    // Red component increases with X, Green component increases with Y
+    // The Blue component is kept constant at a low value for a touch of color
+  float test = randd(vec2(uv.x, uv.y));
+  float test2 = randd(vec2(uv.y, uv.x));
+  vec3 pixelColor = vec3(test, test2, 0.25);
+
+    // Write the computed color to the image at the current pixel coordinate
+  imageStore(resultImage, pixCoord, vec4(pixelColor, 1.0));
+}

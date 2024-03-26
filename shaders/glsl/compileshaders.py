@@ -7,6 +7,7 @@ import sys
 parser = argparse.ArgumentParser(description='Compile all GLSL shaders')
 parser.add_argument('--glslang', type=str, help='path to glslangvalidator executable')
 parser.add_argument('--g', action='store_true', help='compile with debug symbols')
+parser.add_argument('--folder', type=str, help='specify one folder to compile shaders')
 args = parser.parse_args()
 
 def findGlslang():
@@ -29,7 +30,8 @@ def findGlslang():
 
 glslang_path = findGlslang()
 dir_path = os.path.dirname(os.path.realpath(__file__))
-dir_path = dir_path.replace('\\', '/')
+dir_path = dir_path.replace('\\', '/') + '/' + args.folder
+# python .\compileshaders.py --folder computeraster
 for root, dirs, files in os.walk(dir_path):
     for file in files:
         if file.endswith(".vert") or file.endswith(".frag") or file.endswith(".comp") or file.endswith(".geom") or file.endswith(".tesc") or file.endswith(".tese") or file.endswith(".rgen") or file.endswith(".rchit") or file.endswith(".rmiss"):
