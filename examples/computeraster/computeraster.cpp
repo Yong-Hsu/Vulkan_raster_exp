@@ -13,6 +13,11 @@ public:
 
 	// gltf models
 	vkglTF::Model modelSphere;
+	//struct Vertex {
+	//	glm::vec3 pos;
+	//	glm::vec3 color;
+	//};
+	//std::vector<Vertex>& vertexBuffer;
 
 	// Resources for the graphics part of the example. The graphics pipeline simply displays the compute shader output
 	struct Graphics {
@@ -64,6 +69,8 @@ public:
 		camera.rotationSpeed = 0.0f;
 		camera.movementSpeed = 2.5f;
 
+		enabledDeviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+
 #if defined(VK_USE_PLATFORM_MACOS_MVK)
 		// SRS - on macOS set environment variable to ensure MoltenVK disables Metal argument buffers for this example
 		setenv("MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS", "0", 1);
@@ -95,7 +102,7 @@ public:
 	void loadAssets()
 	{
 		const uint32_t glTFLoadingFlags = vkglTF::FileLoadingFlags::PreTransformVertices | vkglTF::FileLoadingFlags::PreMultiplyVertexColors | vkglTF::FileLoadingFlags::FlipY;
-		modelSphere.loadFromFile(getAssetPath() + "models/sphere.gltf", vulkanDevice, queue, glTFLoadingFlags);
+		modelSphere.loadFromFile(getAssetPath() + "models/cube_12.gltf", vulkanDevice, queue, glTFLoadingFlags);
 	}
 
 	// Prepare a storage image that is used to store the compute shader ray tracing output
@@ -364,31 +371,13 @@ public:
 	// Setup and fill the compute shader storage buffes containing object definitions for the raytraced scene
 	void prepareStorageBuffers() 
 	{
-		//std::vector<SceneObject> sceneObjects{};
-		//auto addSphere = [&sceneObjects, &currentId](glm::vec3 pos, float radius, glm::vec3 diffuse, float specular) {
-		//	SceneObject sphere{};
-		//	sphere.id = currentId++;
-		//	sphere.objectProperties.positionAndRadius = glm::vec4(pos, radius);
-		//	sphere.diffuse = diffuse;
-		//	sphere.specular = specular;
-		//	sphere.objectType = (uint32_t)SceneObjectType::Sphere;
-		//	sceneObjects.push_back(sphere);
-		//	};
+		VkDeviceSize storageBufferSize = modelSphere.vertices.count * sizeof(vkglTF::Vertex); 
 
-		//addSphere(glm::vec3(1.75f, -0.5f, 0.0f), 1.0f, glm::vec3(0.0f, 1.0f, 0.0f), 32.0f);
-		//addSphere(glm::vec3(0.0f, 1.0f, -0.5f), 1.0f, glm::vec3(0.65f, 0.77f, 0.97f), 32.0f);
-		//addSphere(glm::vec3(-1.75f, -0.75f, -0.5f), 1.25f, glm::vec3(0.9f, 0.76f, 0.46f), 32.0f);
-
-		//VkDeviceSize storageBufferSize = sceneObjects.size() * sizeof(SceneObject);
-
-		//// Copy the data to the device
-		//vks::Buffer stagingBuffer;
-		//vulkanDevice->createBuffer(VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &stagingBuffer, storageBufferSize, sceneObjects.data());
-		//vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &compute.objectStorageBuffer, storageBufferSize);
-		//VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
-		//VkBufferCopy copyRegion = { 0, 0, storageBufferSize };
-		//vkCmdCopyBuffer(copyCmd, stagingBuffer.buffer, compute.objectStorageBuffer.buffer, 1, &copyRegion);
-		//vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+		vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &compute.objectStorageBuffer, storageBufferSize);
+		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkBufferCopy copyRegion = { 0, 0, storageBufferSize };
+		vkCmdCopyBuffer(copyCmd, modelSphere.vertices.buffer, compute.objectStorageBuffer.buffer, 1, &copyRegion);
+		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
 	}
 
 	// The descriptor pool will be shared between graphics and compute
@@ -480,11 +469,12 @@ public:
 		// The compute pipeline uses one set and four bindings
 		// Binding 0: Storage image for raytraced output
 		// Binding 1: Uniform buffer with parameters
-		// Binding 2: Shader storage buffer with vertex information
+		// Binding 2: Shader storage buffer for vertices
 
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT, 0),
-			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1)
+			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1),
+			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 2),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &compute.descriptorSetLayout));
@@ -493,7 +483,8 @@ public:
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &allocInfo, &compute.descriptorSet));
 		std::vector<VkWriteDescriptorSet> computeWriteDescriptorSets = {
 			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0, &storageImage.descriptor),
-			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &compute.uniformBuffer.descriptor)
+			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &compute.uniformBuffer.descriptor),
+			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, &compute.objectStorageBuffer.descriptor),
 		};
 		vkUpdateDescriptorSets(device, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
 
@@ -533,9 +524,9 @@ public:
 	void updateUniformBuffers()
 	{
 		compute.uniformData.aspectRatio = (float)width / (float)height;
-		compute.uniformData.lightPos.x = 0.0f + sin(glm::radians(timer * 360.0f)) * cos(glm::radians(timer * 360.0f)) * 2.0f;
-		compute.uniformData.lightPos.y = 0.0f + sin(glm::radians(timer * 360.0f)) * 2.0f;
-		compute.uniformData.lightPos.z = 0.0f + cos(glm::radians(timer * 360.0f)) * 2.0f;
+		// compute.uniformData.lightPos.x = 0.0f + sin(glm::radians(timer * 360.0f)) * cos(glm::radians(timer * 360.0f)) * 2.0f;
+		// compute.uniformData.lightPos.y = 0.0f + sin(glm::radians(timer * 360.0f)) * 2.0f;
+		// compute.uniformData.lightPos.z = 0.0f + cos(glm::radians(timer * 360.0f)) * 2.0f;
 		compute.uniformData.camera.pos = camera.position * -1.0f;
 		VK_CHECK_RESULT(compute.uniformBuffer.map());
 		memcpy(compute.uniformBuffer.mapped, &compute.uniformData, sizeof(Compute::UniformDataCompute));
