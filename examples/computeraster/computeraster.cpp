@@ -59,7 +59,7 @@ public:
 
 	VulkanExample() : VulkanExampleBase()
 	{
-		title = "Compute shader ray tracing";
+		title = "raster";
 		timerSpeed *= 0.25f;
 
 		camera.type = Camera::CameraType::lookat;
@@ -70,6 +70,7 @@ public:
 		camera.movementSpeed = 2.5f;
 
 		enabledDeviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+		// enabledDeviceExtensions.push_back(VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME);
 
 #if defined(VK_USE_PLATFORM_MACOS_MVK)
 		// SRS - on macOS set environment variable to ensure MoltenVK disables Metal argument buffers for this example
@@ -112,7 +113,7 @@ public:
 		// Use a smaller image on Android for performance reasons
 		const uint32_t textureSize = 1024;
 #else
-		const uint32_t textureSize = 2048;
+		const uint32_t textureSize = 256;
 #endif
 
 		const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -346,7 +347,8 @@ public:
 		vkCmdBindPipeline(compute.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipeline);
 		vkCmdBindDescriptorSets(compute.commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, compute.pipelineLayout, 0, 1, &compute.descriptorSet, 0, 0);
 
-		vkCmdDispatch(compute.commandBuffer, storageImage.width / 16, storageImage.height / 16, 1);
+		// vkCmdDispatch(compute.commandBuffer, storageImage.width / 16, storageImage.height / 16, 1);
+		vkCmdDispatch(compute.commandBuffer, 1, 1, 1);
 
 		if (vulkanDevice->queueFamilyIndices.graphics != vulkanDevice->queueFamilyIndices.compute)
 		{
@@ -372,6 +374,7 @@ public:
 	void prepareStorageBuffers() 
 	{
 		VkDeviceSize storageBufferSize = modelSphere.vertices.count * sizeof(vkglTF::Vertex); 
+		auto size_test = sizeof(vkglTF::Vertex);
 
 		vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &compute.objectStorageBuffer, storageBufferSize);
 		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);

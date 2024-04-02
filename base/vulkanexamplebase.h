@@ -158,8 +158,10 @@ public:
 	bool prepared = false;
 	bool resized = false;
 	bool viewUpdated = false;
-	uint32_t width = 1280;
-	uint32_t height = 720;
+	//uint32_t width = 1280;
+	//uint32_t height = 720;
+	uint32_t width = 256;
+	uint32_t height = 256;
 
 	vks::UIOverlay UIOverlay;
 	CommandLineParser commandLineParser;
@@ -426,6 +428,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)				
 }																									\
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int)									\
 {																									\
+	AllocConsole();\
 	for (int32_t i = 0; i < __argc; i++) { VulkanExample::args.push_back(__argv[i]); };  			\
 	vulkanExample = new VulkanExample();															\
 	vulkanExample->initVulkan();																	\
