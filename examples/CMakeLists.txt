@@ -87,7 +87,7 @@ set(EXAMPLES
 	# computecullandlod
 	computeheadless
 	computenbody
-	computeparticles
+	# computeparticles
 	computeraytracing
 	computeraster
 	computeshader
@@ -151,7 +151,7 @@ set(EXAMPLES
 	# shaderobjects
 	# shadowmapping
 	# shadowmappingomni
-	# shadowmappingcascade
+	shadowmappingcascade
 	# specializationconstants
 	# sphericalenvmapping
 	# ssao
@@ -175,3 +175,37 @@ set(EXAMPLES
 )
 
 buildExamples()
+
+
+# execute_process(
+#     COMMAND python ${CMAKE_CURRENT_SOURCE_DIR}/../shaders/glsl/compileshaders.py --folder computeraster
+#     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+#     RESULT_VARIABLE result
+# )
+# if(result)
+#     message(FATAL_ERROR "Failed to execute compileshaders.py")
+# endif()
+# 
+# add_custom_target(ShaderFiles ALL DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../shaders/glsl/computerraster/raster.comp)
+
+
+# set(SHADER_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/glsl/computerraster")
+# set(COMPILE_SHADERS_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/../shaders/glsl/compileshaders.py")
+# 
+# # Find all .comp shader files in the shader folder
+# file(GLOB_RECURSE SHADER_FILES "${SHADER_FOLDER}/*.comp")
+# 
+# # Add a custom command that runs the Python script
+# # whenever the shader files change
+# add_custom_command(
+#     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/shaders_compiled.stamp"
+#     COMMAND ${CMAKE_COMMAND} -E echo "Compiling shaders..."
+#     COMMAND python "${COMPILE_SHADERS_SCRIPT}" --folder computeraster
+#     COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/shaders_compiled.stamp"
+#     DEPENDS ${SHADER_FILES}
+#     COMMENT "Compiling shaders using custom script"
+# )
+# 
+# # Create a custom target that depends on the compiled shaders
+# add_custom_target(Shaders ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/shaders_compiled.stamp")
+# add_custom_target(Shaders SOURCES ${SHADER_FILES})

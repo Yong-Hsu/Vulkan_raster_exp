@@ -4,6 +4,7 @@
 
 #include "vulkanexamplebase.h"
 #include "VulkanglTFModel.h"
+#include <cstdlib>
 
 class VulkanExample : public VulkanExampleBase
 {
@@ -33,6 +34,7 @@ public:
 		// There is no vertex data, the compute shader calculates the primitives on the fly
 		vks::Buffer objectStorageBuffer;
 		vks::Buffer uniformBuffer;										// Uniform buffer object containing scene parameters
+		vks::Buffer indicesBuffer;
 		VkQueue queue{ VK_NULL_HANDLE };								// Separate queue for compute commands (queue family may differ from the one used for graphics)
 		VkCommandPool commandPool{ VK_NULL_HANDLE };					// Use a separate command pool (queue family may differ from the one used for graphics)
 		VkCommandBuffer commandBuffer{ VK_NULL_HANDLE };				// Command buffer storing the dispatch commands and barriers
@@ -76,6 +78,12 @@ public:
 		// SRS - on macOS set environment variable to ensure MoltenVK disables Metal argument buffers for this example
 		setenv("MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS", "0", 1);
 #endif
+
+		// nasty solution to build the shaders
+		const char* command = "python C:/Users/neptu/Desktop/obsidian/res_git/sascha_vk/shaders/glsl/compileshaders.py --folder computeraster";
+
+		// Running the command
+		int result = system(command);
 	}
 
 	~VulkanExample()
@@ -94,6 +102,7 @@ public:
 			vkDestroyCommandPool(device, compute.commandPool, nullptr);
 			compute.uniformBuffer.destroy();
 			compute.objectStorageBuffer.destroy();
+			compute.indicesBuffer.destroy();
 
 			storageImage.destroy();
 		}
@@ -113,7 +122,7 @@ public:
 		// Use a smaller image on Android for performance reasons
 		const uint32_t textureSize = 1024;
 #else
-		const uint32_t textureSize = 256;
+		const uint32_t textureSize = 512;
 #endif
 
 		const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -373,14 +382,20 @@ public:
 	// Setup and fill the compute shader storage buffes containing object definitions for the raytraced scene
 	void prepareStorageBuffers() 
 	{
-		VkDeviceSize storageBufferSize = modelSphere.vertices.count * sizeof(vkglTF::Vertex); 
-		auto size_test = sizeof(vkglTF::Vertex);
+		VkDeviceSize storageBufferSize = modelSphere.vertices.count * sizeof(vkglTF::Vertex);
+		VkDeviceSize indicesBufferSize = modelSphere.indices.count * sizeof(uint32_t);
 
 		vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &compute.objectStorageBuffer, storageBufferSize);
 		VkCommandBuffer copyCmd = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
 		VkBufferCopy copyRegion = { 0, 0, storageBufferSize };
 		vkCmdCopyBuffer(copyCmd, modelSphere.vertices.buffer, compute.objectStorageBuffer.buffer, 1, &copyRegion);
 		vulkanDevice->flushCommandBuffer(copyCmd, queue, true);
+
+		vulkanDevice->createBuffer(VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &compute.indicesBuffer, indicesBufferSize);
+		VkCommandBuffer copyCmd_index = vulkanDevice->createCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, true);
+		VkBufferCopy copyRegion_index = { 0, 0, indicesBufferSize };
+		vkCmdCopyBuffer(copyCmd_index, modelSphere.indices.buffer, compute.indicesBuffer.buffer, 1, &copyRegion_index);
+		vulkanDevice->flushCommandBuffer(copyCmd_index, queue, true);
 	}
 
 	// The descriptor pool will be shared between graphics and compute
@@ -390,9 +405,10 @@ public:
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2),
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4),
 			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1),
-			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2),
+			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3),
+			vks::initializers::descriptorPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3)
 		};
-		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 3);
+		VkDescriptorPoolCreateInfo descriptorPoolInfo = vks::initializers::descriptorPoolCreateInfo(poolSizes, 4);
 		VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolInfo, nullptr, &descriptorPool));
 	}
 
@@ -473,11 +489,13 @@ public:
 		// Binding 0: Storage image for raytraced output
 		// Binding 1: Uniform buffer with parameters
 		// Binding 2: Shader storage buffer for vertices
+		// Binding 3: shader storage buffer for indices
 
 		std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings = {
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT, 0),
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 1),
 			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 2),
+			vks::initializers::descriptorSetLayoutBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT, 3),
 		};
 		VkDescriptorSetLayoutCreateInfo descriptorLayout = vks::initializers::descriptorSetLayoutCreateInfo(setLayoutBindings);
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &compute.descriptorSetLayout));
@@ -488,6 +506,7 @@ public:
 			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 0, &storageImage.descriptor),
 			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &compute.uniformBuffer.descriptor),
 			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2, &compute.objectStorageBuffer.descriptor),
+			vks::initializers::writeDescriptorSet(compute.descriptorSet, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3, &compute.indicesBuffer.descriptor)
 		};
 		vkUpdateDescriptorSets(device, static_cast<uint32_t>(computeWriteDescriptorSets.size()), computeWriteDescriptorSets.data(), 0, nullptr);
 
