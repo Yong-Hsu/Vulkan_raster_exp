@@ -2,7 +2,7 @@
     "rdocCaptureSettings": 1,
     "settings": {
         "autoStart": false,
-        "commandLine": "--gpu 1",
+        "commandLine": "--gpu 0",
         "environment": [
         ],
         "executable": "C:\\Users\\neptu\\Desktop\\obsidian\\res_git\\sascha_vk\\build\\bin\\Debug\\computeraster.exe",
@@ -11,9 +11,9 @@
         "options": {
             "allowFullscreen": true,
             "allowVSync": true,
-            "apiValidation": false,
+            "apiValidation": true,
             "captureAllCmdLists": false,
-            "captureCallstacks": false,
+            "captureCallstacks": true,
             "captureCallstacksOnlyDraws": false,
             "debugOutputMute": true,
             "delayForDebugger": 0,

@@ -14,11 +14,6 @@ public:
 
 	// gltf models
 	vkglTF::Model modelSphere;
-	//struct Vertex {
-	//	glm::vec3 pos;
-	//	glm::vec3 color;
-	//};
-	//std::vector<Vertex>& vertexBuffer;
 
 	// Resources for the graphics part of the example. The graphics pipeline simply displays the compute shader output
 	struct Graphics {
@@ -56,8 +51,7 @@ public:
 		} uniformData;
 	} compute;
 
-	// todo: sceneobject removed
-	// enum class SceneObjectType { Sphere = 0, Plane = 1 };
+	const uint32_t render_size = 512;
 
 	VulkanExample() : VulkanExampleBase()
 	{
@@ -122,7 +116,7 @@ public:
 		// Use a smaller image on Android for performance reasons
 		const uint32_t textureSize = 1024;
 #else
-		const uint32_t textureSize = 512;
+		const uint32_t textureSize = render_size;
 #endif
 
 		const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
